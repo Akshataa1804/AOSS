@@ -1,36 +1,16 @@
-import { useState } from 'react';
-import axios from 'axios';
+import UploadPanel from "./components/UploadPanel";
+import DocumentList from "./components/DocumentList";
+import ComplianceViewer from "./components/ComplianceViewer";
+import TestRagTool from "./components/TestRagTool";
 
-function App() {
-  const [file, setFile] = useState(null);
-
-  const handleFileChange = (e) => setFile(e.target.files[0]);
-
-  const handleUpload = async () => {
-    if (!file) return alert("Please select a file.");
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const res = await axios.post("http://localhost:8000/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
-      alert(res.data.message);
-    } catch (err) {
-      console.error(err);
-      alert("Upload failed");
-    }
-  };
-
+export default function App() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-100 p-4">
-      <input type="file" onChange={handleFileChange} className="border p-2 rounded" />
-      <button onClick={handleUpload} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-        Upload
-      </button>
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <h1 className="text-2xl font-bold">Compliance Document Manager</h1>
+      <UploadPanel />
+      <DocumentList />
+      <ComplianceViewer />
+      <TestRagTool />
     </div>
   );
 }
-
-export default App;

@@ -1,2 +1,14 @@
-venv/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 .venv/
+venv/
+
+# Chroma persistence
+chroma_store/
+
+# Uploads
+uploads/*
+!uploads/.keep
