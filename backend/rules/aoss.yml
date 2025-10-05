@@ -1,0 +1,20 @@
+allowed:
+- top
+- df-h
+- htop
+- du-sh
+- ps
+- tree
+- find
+forbidden:
+- Modifying /etc/passwd or /etc/shadow
+- mkfs
+- formatting commands
+- Deleting system libraries (/usr/lib, /lib, /bin)
+- Installing unverified .deb packages
+- rm-rf
+- reboot
+- shutdown
+required:
+- '{''Networkrestart'': ''admin approval required''}'
+- '{''Packageupdate'': ''maintenance window required''}'

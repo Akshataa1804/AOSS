@@ -1,0 +1,41 @@
+# =====================
+# Python
+# =====================
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+*.egg-info/
+*.sqlite3
+
+# Chroma DB / local DB
+backend/chroma_db/
+backend/chroma_store/
+backend/uploaded_docs/
+
+# =====================
+# Node / React
+# =====================
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+*.local
+.env
+
+# =====================
+# IDE / OS
+# =====================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# =====================
+# Other unwanted files
+# =====================
+*.log
