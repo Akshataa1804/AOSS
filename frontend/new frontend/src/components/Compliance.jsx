@@ -120,7 +120,7 @@ export default function Compliance() {
     } catch (err) {
       console.error(err);
       alert("Failed to run query");
-    } finally {
+    } finally {   
       setLoading(false);
     }
   }
@@ -318,7 +318,7 @@ export default function Compliance() {
                     onClick={runQuery}
                     disabled={loading || !selectedDoc}
                     className="btn bg-blue-600 hover:bg-blue-700 border-none text-white"
-                  >
+                  > 
                     {loading ? "Running..." : "Run Query"}
                   </button>
                 </div>

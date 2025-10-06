@@ -1,20 +1,19 @@
 allowed:
 - top
-- df-h
-- htop
 - du-sh
-- ps
-- tree
+- df-h
+- ls
 - find
+- tree
+- ps
+- htop
 forbidden:
-- Modifying /etc/passwd or /etc/shadow
-- mkfs
-- formatting commands
-- Deleting system libraries (/usr/lib, /lib, /bin)
-- Installing unverified .deb packages
-- rm-rf
+- formatting
 - reboot
 - shutdown
-required:
-- '{''Networkrestart'': ''admin approval required''}'
-- '{''Packageupdate'': ''maintenance window required''}'
+- installing unverified .deb packages
+- modifying /etc/passwd or /etc/shadow
+- rm-rf
+- mkfs
+- deleting system libraries (usr/lib, lib, bin)
+required: []

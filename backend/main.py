@@ -3,7 +3,8 @@ import shutil
 from fastapi import FastAPI, UploadFile, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Dict, Any
+from rag_utils import run_rag_query
+from typing import Dict, Any, List
 import yaml
 
 from compliance_utils import extract_rules_from_pdf, get_rules, add_rule, delete_rule
@@ -35,6 +36,7 @@ app.add_middleware(
 # ----------------------------
 class RAGRequest(BaseModel):
     query: str
+    # rules: Dict[str, List[str]]
 
 class RAGResponse(BaseModel):
     query: str
@@ -131,9 +133,20 @@ def delete_rule_endpoint(
 @app.post("/rag", response_model=RAGResponse)
 async def rag_endpoint(request: RAGRequest):
     # For now return dummy response
+    query_res = run_rag_query(query=request.query)
+    print(query_res)
+
+    # {
+    #     "query": query,
+    #     "planner_raw": raw,
+    #     "safe_plan": safe_plan,
+    #     "violations": violations,
+    #     "status": "success" if safe_plan else ("violations" if violations else "no_plan"),
+    # }
+
     return {
-        "query": request.query,
+        "query": query_res['query'],
         "plan": "RAG executed",
         "status": "success",
-        "compliance": {"allowed": [], "forbidden": [], "required": []}
+        "compliance": {"allowed": query_res['safe_plan'], "forbidden": query_res['violations'], "required": []}
     }
