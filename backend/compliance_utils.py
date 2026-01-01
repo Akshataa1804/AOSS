@@ -1,109 +1,119 @@
 import subprocess
-import yaml
+import json
+import re
 from PyPDF2 import PdfReader
 from pathlib import Path
 
-# ----------------------------
-# LLM-based Rule Extraction
-# ----------------------------
+
+# ------------------------------------------------------------
+# LLM CALL (WINDOWS-SAFE)
+# ------------------------------------------------------------
 def call_llm(prompt: str) -> str:
-    """Call Ollama model and return raw response."""
     try:
         result = subprocess.run(
-            ["ollama", "run", "llama3"],
-            input=prompt,
-            text=True,
+            ["ollama", "run", "llama3", prompt],
             capture_output=True,
-            check=True
+            text=True,
+            errors="ignore"  # avoids cp1252 crash
         )
         return result.stdout.strip()
-    except subprocess.CalledProcessError as e:
-        print("⚠️ LLM call failed:", e)
+    except Exception as e:
+        print("⚠ LLM call failed:", e)
         return ""
 
-def extract_rules_from_pdf(file_path: str) -> dict:
-    """
-    Extract compliance rules from natural language PDF using LLM.
-    Returns dict with allowed, forbidden, required keys.
-    """
-    # 1. Read PDF text
+
+# ------------------------------------------------------------
+# PDF → ACTION EXTRACTION (ROBUST)
+# ------------------------------------------------------------
+def extract_threats_from_pdf(file_path: str) -> dict:
+    # ---- Read PDF ----
     reader = PdfReader(file_path)
     text = ""
     for page in reader.pages:
         text += page.extract_text() or ""
 
     if not text.strip():
-        return {"allowed": [], "forbidden": [], "required": []}
+        return {"actions": []}
 
-    # 2. Prepare prompt
+    # ---- Prompt ----
     prompt = f"""
-    Extract compliance rules from the following text into YAML with keys: allowed, forbidden, required.
-    Output ONLY valid YAML, no explanations.
+Convert the following compliance policy into operational actions.
 
-    Text:
-    {text}
+Return the result as JSON.
+The JSON may be either:
+- a list of action objects
+- or an object with key "actions"
 
-    Example format:
-    allowed:
-      - ls
-      - pwd
-    forbidden:
-      - rm
-      - shutdown
-    required:
-      - check_user
-    """
+Each action object must have:
+command, intent, service, affected_system,
+risk_level (low|medium|high|critical),
+needs_approval (true|false),
+dependencies (list), policy_ref
 
-    # 3. Call LLM
-    response = call_llm(prompt)
+POLICY TEXT:
+{text}
+"""
 
-    # 4. Clean output
-    cleaned = response.strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.strip("` \n")
-        if cleaned.lower().startswith("yaml"):
-            cleaned = cleaned[4:].strip()
+    raw = call_llm(prompt)
 
-    # 5. Parse YAML safely
-    rules = {"allowed": [], "forbidden": [], "required": []}
+    if not raw:
+        print("⚠ Empty LLM output")
+        return {"actions": []}
+
+    # ---- Extract FIRST JSON object or array from text ----
+    json_match = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])", raw)
+    if not json_match:
+        print("⚠ Could not find JSON in output:\n", raw)
+        return {"actions": []}
+
+    json_text = json_match.group(1)
+
+    # ---- Parse JSON ----
     try:
-        parsed = yaml.safe_load(cleaned)
-        if isinstance(parsed, dict):
-            for k in ["allowed", "forbidden", "required"]:
-                rules[k] = list({str(cmd).strip() for cmd in parsed.get(k, []) if cmd})
-    except yaml.YAMLError:
-        print("⚠️ Failed to parse LLM output:", response)
+        parsed = json.loads(json_text)
+    except Exception as e:
+        print("⚠ JSON parse error:", e)
+        print("⚠ Extracted text:\n", json_text)
+        return {"actions": []}
 
-    return rules
+    # ---- Normalize ----
+    if isinstance(parsed, list):
+        actions = parsed
+    elif isinstance(parsed, dict) and "actions" in parsed:
+        actions = parsed["actions"]
+    else:
+        print("⚠ Unexpected JSON structure:", parsed)
+        return {"actions": []}
 
-# ----------------------------
-# Rule File Management
-# ----------------------------
-def ensure_rules_file(rules_file: str):
-    """Create empty YAML if it doesn't exist."""
-    if not Path(rules_file).exists():
-        with open(rules_file, "w") as f:
-            yaml.dump({"allowed": [], "forbidden": [], "required": []}, f)
+    normalized = []
+    for item in actions:
+        normalized.append({
+            "command": str(item.get("command", "")).strip(),
+            "intent": str(item.get("intent", "")).strip(),
+            "service": str(item.get("service", "")).strip(),
+            "affected_system": str(item.get("affected_system", "")).strip(),
+            "risk_level": str(item.get("risk_level", "")).lower().strip(),
+            "needs_approval": bool(item.get("needs_approval", False)),
+            "dependencies": item.get("dependencies", []) if isinstance(item.get("dependencies", []), list) else [],
+            "policy_ref": str(item.get("policy_ref", "")).strip()
+        })
 
-def get_rules(rules_file: str) -> dict:
-    ensure_rules_file(rules_file)
-    with open(rules_file, "r") as f:
-        data = yaml.safe_load(f) or {"allowed": [], "forbidden": [], "required": []}
-    # Deduplicate & strip
-    for k in data:
-        data[k] = list({str(i).strip() for i in data[k] if i})
-    return data
+    return {"actions": normalized}
 
-def add_rule(rules_file: str, rule_type: str, rule_value: str):
-    rules = get_rules(rules_file)
-    if rule_value.strip() and rule_value not in rules[rule_type]:
-        rules[rule_type].append(rule_value.strip())
-        with open(rules_file, "w") as f:
-            yaml.dump(rules, f)
 
-def delete_rule(rules_file: str, rule_type: str, rule_value: str):
-    rules = get_rules(rules_file)
-    if rule_value.strip() in rules[rule_type]:
-        rules[rule_type].remove(rule_value.strip())
-        with open(rules_file, "w") as f:
-            yaml.dump(rules, f)
+# ------------------------------------------------------------
+# JSON PERSISTENCE (OPTIONAL)
+# ------------------------------------------------------------
+def save_threat_json(file_path: str, data: dict):
+    rules_dir = Path("rules")
+    rules_dir.mkdir(exist_ok=True)
+    out_path = rules_dir / f"{Path(file_path).stem}.json"
+    out_path.write_text(json.dumps(data, indent=2))
+    return out_path.as_posix()
+
+
+def load_threat_json(filename: str) -> dict:
+    path = Path("rules") / f"{Path(filename).stem}.json"
+    if not path.exists():
+        return {"actions": []}
+    return json.loads(path.read_text())
