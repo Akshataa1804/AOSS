@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, UploadCloud, FileText, Zap } from "lucide-react";
+import { ShieldCheck, UploadCloud, FileText, Zap, Share2 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, Server, BarChart3, Bot, Cpu } from "lucide-react";
-import * as api from "../api"; // Make sure api.js is in src folder
+import * as api from "../api";
+import GraphPanel from "./GraphPanel";   // 🚨 new component – next file we will create
 
 function NavLink({ to, icon: Icon, children }) {
   const location = useLocation();
@@ -37,6 +38,7 @@ export default function Compliance() {
   const [response, setResponse] = useState(null);
   const [loading, setLoading] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
+  const [graphSynced, setGraphSynced] = useState(false); // 🆕
 
   useEffect(() => {
     fetchDocs();
@@ -46,8 +48,7 @@ export default function Compliance() {
     try {
       const data = await api.listDocuments();
       setDocs(data.documents || []);
-    } catch (err) {
-      console.error(err);
+    } catch {
       alert("Failed to fetch documents");
     }
   }
@@ -59,77 +60,72 @@ export default function Compliance() {
       alert("File uploaded successfully");
       setUploadFile(null);
       fetchDocs();
-    } catch (err) {
-      console.error(err);
+    } catch {
       alert("Upload failed");
     }
   }
 
   async function fetchRulesFromPDF(doc) {
-    if (!doc) return;
     try {
       await api.extractRules(doc);
-      alert("Rules extracted and saved");
+      alert("Rules extracted");
       fetchRules(doc);
-    } catch (err) {
-      console.error(err);
+    } catch {
       alert("Failed to extract rules");
     }
   }
 
   async function fetchRules(doc) {
-    if (!doc) return;
     try {
       const data = await api.fetchRules(doc);
       setRules(data.rules || { allowed: [], forbidden: [], required: [] });
-    } catch (err) {
-      console.error(err);
+    } catch {
       alert("Failed to fetch rules");
     }
   }
 
   async function handleAddRule() {
-    if (!selectedDoc || !newRule.trim()) return alert("Enter a rule");
+    if (!selectedDoc || !newRule.trim()) return;
     try {
       await api.addRule(selectedDoc, newType, newRule);
       setNewRule("");
       fetchRules(selectedDoc);
-    } catch (err) {
-      console.error(err);
+    } catch {
       alert("Failed to add rule");
     }
   }
 
   async function handleDeleteRule(type, value) {
-    if (!selectedDoc) return;
     try {
       await api.deleteRule(selectedDoc, type, value);
       fetchRules(selectedDoc);
-    } catch (err) {
-      console.error(err);
+    } catch {
       alert("Failed to delete rule");
     }
   }
 
   async function runQuery() {
-    if (!selectedDoc || !query.trim()) return;
+    if (!query.trim()) return;
     setLoading(true);
     try {
       const data = await api.runRAGQuery(selectedDoc, query);
       setResponse(data);
-    } catch (err) {
-      console.error(err);
+    } catch {
       alert("Failed to run query");
-    } finally {   
-      setLoading(false);
     }
+    setLoading(false);
+  }
+
+  // 🆕 Placeholder UI button – real backend will be added later
+  function handleSyncGraph() {
+    setGraphSynced(true);
+    alert("Policies will sync to Graph when backend is ready");
   }
 
   return (
     <div className="flex min-h-screen bg-base-200 text-base-content">
-      {/* Sidebar */}
       <aside className="w-64 bg-base-100 flex flex-col border-r border-base-300/50 pt-24 fixed h-full">
-        <div className="flex items-center space-x-3 px-6 py-5 border-b border-base-300/50">
+        <div className="flex items-center px-6 py-5 border-b border-base-300/50 space-x-3">
           <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
             <Cpu className="w-6 h-6 text-primary" />
           </div>
@@ -144,49 +140,32 @@ export default function Compliance() {
             <NavLink to="/chat" icon={Bot}>Orchestrate</NavLink>
           </ul>
         </nav>
-        <div className="px-6 py-4 border-t border-base-300/50">
-          <div className="flex items-center space-x-3">
-            <div className="avatar placeholder">
-              <div className="bg-neutral-focus text-neutral-content rounded-full w-10">
-                <span>A</span>
-              </div>
-            </div>
-            <div>
-              <p className="font-semibold text-sm">Admin User</p>
-              <p className="text-xs text-base-content/60">Lead SRE</p>
-            </div>
-          </div>
-        </div>
       </aside>
 
-      {/* Main */}
       <main className="flex-1 p-8 pt-24 ml-64">
         <header className="mb-8">
           <h1 className="text-3xl font-bold flex items-center gap-2 text-base-content">
             <ShieldCheck className="w-7 h-7 text-blue-400" /> Compliance
           </h1>
           <p className="text-base-content/60 mt-1">
-            Manage compliance rules, upload policy documents, and test safe execution.
+            Manage compliance rules, upload policy documents, sync to graph reasoning, and test execution safety.
           </p>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column */}
+          {/* LEFT COLUMN */}
           <div className="space-y-6">
-            {/* Upload */}
+
+            {/* UPLOAD */}
             <div className="card bg-base-100 shadow-md border border-base-300/50">
               <div className="card-body">
                 <h2 className="card-title flex items-center gap-2">
                   <UploadCloud className="w-5 h-5 text-blue-400" /> Upload PDF
                 </h2>
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) => setUploadFile(e.target.files[0])}
-                  className="mt-3 file-input file-input-bordered w-full bg-base-200 text-base-content border-base-300"
+                <input type="file" accept=".pdf" onChange={(e) => setUploadFile(e.target.files[0])}
+                  className="mt-3 file-input file-input-bordered w-full bg-base-200 border-base-300"
                 />
-                <button
-                  onClick={handleUpload}
+                <button onClick={handleUpload}
                   className="btn bg-blue-600 hover:bg-blue-700 border-none text-white mt-3 w-full"
                 >
                   Upload
@@ -194,48 +173,41 @@ export default function Compliance() {
               </div>
             </div>
 
-            {/* Documents */}
+            {/* DOCUMENTS */}
             <div className="card bg-base-100 shadow-md border border-base-300/50">
               <div className="card-body">
                 <h2 className="card-title flex items-center gap-2">
                   <FileText className="w-5 h-5 text-blue-400" /> Uploaded Documents
                 </h2>
                 <ul className="mt-4 space-y-2">
-                  {docs.length > 0 ? (
-                    docs.map((doc) => (
-                      <li key={doc}>
-                        <button
-                          onClick={() => {
-                            setSelectedDoc(doc);
-                            fetchRules(doc);
-                          }}
-                          className={`w-full text-left px-4 py-2 rounded-lg ${
-                            selectedDoc === doc
-                              ? "bg-blue-600 text-white"
-                              : "bg-base-200 hover:bg-base-300 text-base-content/70"
-                          }`}
-                        >
-                          {doc}
-                        </button>
-                        <button
-                          onClick={() => fetchRulesFromPDF(doc)}
-                          className="ml-2 btn btn-xs bg-green-500 hover:bg-green-600 text-white"
-                        >
-                          Extract Rules
-                        </button>
-                      </li>
-                    ))
-                  ) : (
-                    <li className="text-sm text-base-content/60">No documents uploaded</li>
-                  )}
+                  {docs.length ? docs.map((doc) => (
+                    <li key={doc}>
+                      <button
+                        onClick={() => { setSelectedDoc(doc); fetchRules(doc); }}
+                        className={`w-full text-left px-4 py-2 rounded-lg ${
+                          selectedDoc === doc
+                            ? "bg-blue-600 text-white"
+                            : "bg-base-200 hover:bg-base-300 text-base-content/70"
+                        }`}
+                      >
+                        {doc}
+                      </button>
+                      <button onClick={() => fetchRulesFromPDF(doc)}
+                        className="ml-2 btn btn-xs bg-green-500 hover:bg-green-600 text-white"
+                      >
+                        Extract Rules
+                      </button>
+                    </li>
+                  )) : <li className="text-sm text-base-content/60">No documents uploaded</li>}
                 </ul>
               </div>
             </div>
           </div>
 
-          {/* Middle Column */}
+          {/* RIGHT AREA */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Rules */}
+
+            {/* RULES */}
             <div className="card bg-base-100 shadow-md border border-base-300/50">
               <div className="card-body">
                 <h2 className="card-title flex items-center gap-2">
@@ -247,59 +219,59 @@ export default function Compliance() {
                     <div key={type} className="border rounded-lg p-4 bg-base-200 border-base-300">
                       <h3 className="font-semibold capitalize mb-2">{type}</h3>
                       <ul className="space-y-1 text-sm">
-                        {(rules[type] || []).length > 0 ? (
-                          rules[type].map((r, idx) => (
-                            <li
-                              key={idx}
-                              className="flex justify-between items-center bg-base-100 p-2 rounded-md border border-base-300"
+                        {rules[type]?.length
+                          ? rules[type].map((r, idx) => (
+                            <li key={idx}
+                              className="flex justify-between items-center bg-base-100 p-2 rounded-md border"
                             >
                               <span>{r}</span>
-                              <button
-                                className="text-red-400 text-xs"
+                              <button className="text-red-400 text-xs"
                                 onClick={() => handleDeleteRule(type, r)}
                               >
                                 Delete
                               </button>
                             </li>
                           ))
-                        ) : (
-                          <li className="text-base-content/60 text-sm">No rules</li>
-                        )}
+                          : <li className="text-base-content/60 text-sm">No rules</li>
+                        }
                       </ul>
                     </div>
                   ))}
                 </div>
 
-                {/* Add Rule */}
+                {/* ADD RULE */}
                 <div className="mt-6 flex flex-wrap gap-3 items-center">
-                  <input
-                    type="text"
-                    placeholder="Enter new rule..."
-                    value={newRule}
-                    onChange={(e) => setNewRule(e.target.value)}
-                    className="input input-bordered w-full md:w-1/2 bg-base-200 text-base-content border-base-300"
+                  <input type="text" placeholder="Enter new rule..."
+                    value={newRule} onChange={(e) => setNewRule(e.target.value)}
+                    className="input input-bordered w-full md:w-1/2 bg-base-200 border-base-300"
                   />
-                  <select
-                    value={newType}
-                    onChange={(e) => setNewType(e.target.value)}
-                    className="select select-bordered bg-base-200 text-base-content border-base-300"
+                  <select value={newType} onChange={(e) => setNewType(e.target.value)}
+                    className="select select-bordered bg-base-200 border-base-300"
                   >
                     <option value="forbidden">forbidden</option>
                     <option value="allowed">allowed</option>
                     <option value="required">required</option>
                   </select>
-                  <button
-                    onClick={handleAddRule}
+                  <button onClick={handleAddRule}
                     disabled={!selectedDoc || !newRule.trim()}
                     className="btn bg-blue-600 hover:bg-blue-700 border-none text-white"
                   >
                     Add
                   </button>
                 </div>
+
+                {/* 🆕 SYNC TO GRAPH */}
+                <button
+                  onClick={handleSyncGraph}
+                  disabled={!selectedDoc}
+                  className="btn btn-sm bg-purple-600 hover:bg-purple-700 text-white mt-6"
+                >
+                  <Share2 className="w-4 h-4 mr-2" /> Sync Policies to Graph
+                </button>
               </div>
             </div>
 
-            {/* RAG Test */}
+            {/* RAG */}
             <div className="card bg-base-100 shadow-md border border-base-300/50">
               <div className="card-body">
                 <h2 className="card-title flex items-center gap-2">
@@ -312,22 +284,31 @@ export default function Compliance() {
                     placeholder="Enter your query..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    className="input input-bordered w-full md:w-2/3 bg-base-200 text-base-content border-base-300"
+                    className="input input-bordered w-full md:w-2/3 bg-base-200 border-base-300"
                   />
                   <button
                     onClick={runQuery}
                     disabled={loading || !selectedDoc}
                     className="btn bg-blue-600 hover:bg-blue-700 border-none text-white"
-                  > 
+                  >
                     {loading ? "Running..." : "Run Query"}
                   </button>
                 </div>
 
                 {response && (
                   <div className="mt-6 p-4 bg-base-200 rounded-lg max-h-[400px] overflow-y-auto text-sm border border-base-300">
-                    <h3 className="font-semibold">Response</h3>
+                    <h3 className="font-semibold">Response (YAML Rules-Based)</h3>
                     <pre>{JSON.stringify(response, null, 2)}</pre>
                   </div>
+                )}
+
+                {/* 🆕 GRAPH VISUAL PANEL */}
+                {graphSynced && response && (
+                  <GraphPanel
+                    command={
+                      response?.violations?.[0]?.command || response?.compliance?.forbidden?.[0]?.command
+                    }
+                  />
                 )}
               </div>
             </div>
